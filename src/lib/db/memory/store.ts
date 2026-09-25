@@ -4,6 +4,7 @@
  * before any backend exists. Data lives only for the life of the process.
  */
 import type {
+  ConversationMessage,
   Project,
   Reminder,
   Task,
@@ -22,10 +23,11 @@ export type MemoryStore = {
   waiting: WaitingFor[];
   reminders: Reminder[];
   profiles: UserProfile[];
+  conversations: ConversationMessage[];
 };
 
 export function emptyStore(): MemoryStore {
-  return { tasks: [], activity: [], projects: [], waiting: [], reminders: [], profiles: [] };
+  return { tasks: [], activity: [], projects: [], waiting: [], reminders: [], profiles: [], conversations: [] };
 }
 
 export function defaultProfile(userId: string, createdAt: string): UserProfile {
@@ -174,6 +176,10 @@ export function createMemoryRepositories(
         const profile = store.profiles.find((p) => p.id === userId);
         return profile ? clone(profile) : null;
       },
+      async findByPhone(phoneNumber) {
+        const profile = store.profiles.find((p) => p.phoneNumber === phoneNumber);
+        return profile ? clone(profile) : null;
+      },
       async update(userId, patch) {
         let profile = store.profiles.find((p) => p.id === userId);
         if (!profile) {
@@ -182,6 +188,33 @@ export function createMemoryRepositories(
         }
         Object.assign(profile, patch);
         return clone(profile);
+      },
+    },
+
+    conversations: {
+      async insert(userId, data) {
+        if (data.externalId && store.conversations.some((m) => m.externalId === data.externalId)) {
+          throw new Error("duplicate external_id");
+        }
+        const row: ConversationMessage = { ...data, id: newId(), userId, createdAt: stamp() };
+        store.conversations.push(row);
+        return clone(row);
+      },
+      async update(userId, id, patch) {
+        const row = store.conversations.find((m) => m.userId === userId && m.id === id);
+        if (row) Object.assign(row, patch);
+      },
+      async findByExternalId(externalId) {
+        const row = store.conversations.find((m) => m.externalId === externalId);
+        return row ? clone(row) : null;
+      },
+      async listRecent(userId, limit) {
+        return clone(
+          store.conversations
+            .filter((m) => m.userId === userId)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+            .slice(0, limit),
+        );
       },
     },
   };

@@ -75,3 +75,49 @@ Dashboard (server components, server actions)   REST API (/api/*)   WhatsApp web
   the AI planning agent in Phase 6 builds on them. Scores are never shown.
 - **Calendar data is mocked** (`calendar-service.ts`) behind a
   `CalendarProvider` interface that the Google provider will implement.
+
+## WhatsApp (Phase 2)
+
+`POST /api/whatsapp` receives Meta webhooks; `GET /api/whatsapp` answers the
+verification handshake. For each message it: ignores redeliveries (same
+`wamid`), finds the user by `users.phone_number`, stores the message in
+`conversation_messages`, replies, and stores the reply. There is no AI yet, so
+the reply only acknowledges and never claims to have done anything.
+
+- Every POST must carry a valid `X-Hub-Signature-256` (HMAC of the raw body
+  with `WHATSAPP_APP_SECRET`). In production, requests are refused if the
+  secret is not set.
+- Without `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` replies are a
+  dry run: logged, stored, not sent.
+- Logs are JSON lines; tokens are redacted and phone numbers masked.
+
+Try it locally (demo mode already has a user with the fictional number +15550100001):
+
+```bash
+WHATSAPP_VERIFY_TOKEN=dev WHATSAPP_APP_SECRET=dev npm run dev
+WHATSAPP_VERIFY_TOKEN=dev node scripts/simulate-whatsapp.mjs --verify
+WHATSAPP_APP_SECRET=dev node scripts/simulate-whatsapp.mjs "Call the doctor tomorrow"
+```
+
+### Connecting a real WhatsApp number
+
+1. Deploy somewhere public with HTTPS (Vercel: import the repo, add the env
+   vars from `.env.example`, deploy). Meta cannot reach localhost; for local
+   testing a tunnel such as `ngrok http 3000` also works.
+2. https://developers.facebook.com → My Apps → Create app → type **Business**.
+   Add the **WhatsApp** product. Meta gives you a free test number.
+3. WhatsApp → API Setup: copy the **Phone number ID** into
+   `WHATSAPP_PHONE_NUMBER_ID` and the temporary **access token** into
+   `WHATSAPP_ACCESS_TOKEN` (it expires after 24h; for a lasting token create a
+   System User in Business Settings with `whatsapp_business_messaging`
+   permission and generate a permanent token). Under "To", add and verify
+   your own phone number as a recipient.
+4. App settings → Basic: copy the **App secret** into `WHATSAPP_APP_SECRET`.
+5. Pick any random string for `WHATSAPP_VERIFY_TOKEN` and redeploy.
+6. WhatsApp → Configuration → Webhook: Callback URL
+   `https://<your-app>/api/whatsapp`, Verify token = the same string →
+   **Verify and save**. Then under Webhook fields, **Subscribe** to `messages`.
+7. In the dashboard, Settings → WhatsApp number: enter your number in
+   international format (e.g. +972501234567) and save.
+8. Send "hello" from your phone to the test number. You should get a reply,
+   and see the exchange in Supabase → `conversation_messages`.

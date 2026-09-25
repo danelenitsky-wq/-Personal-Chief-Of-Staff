@@ -9,6 +9,7 @@ import type { MemoryStore } from "./store";
 
 export const DEMO_USER_ID = "00000000-0000-4000-8000-000000000001";
 export const DEMO_TIMEZONE = "Asia/Jerusalem";
+export const DEMO_PHONE = "+15550100001";
 
 type TaskSeed = Partial<Task> & { title: string };
 
@@ -21,7 +22,8 @@ export function buildDemoStore(now: Date = new Date()): MemoryStore {
   const profile: UserProfile = {
     id: userId,
     name: "Dany",
-    phoneNumber: undefined,
+    // Fictional number so the webhook can be exercised locally in demo mode.
+    phoneNumber: DEMO_PHONE,
     timezone: DEMO_TIMEZONE,
     weekStartsOn: 0,
     morningBriefTime: "07:30",
@@ -372,5 +374,6 @@ export function buildDemoStore(now: Date = new Date()): MemoryStore {
     waiting: waitingItems,
     reminders: [],
     profiles: [profile],
+    conversations: [],
   };
 }

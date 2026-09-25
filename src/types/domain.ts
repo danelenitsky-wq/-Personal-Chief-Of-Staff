@@ -199,3 +199,19 @@ export type Memory = {
   category?: string | null;
   createdAt: string;
 };
+
+export type ConversationMessage = {
+  id: string;
+  userId: string;
+  direction: "inbound" | "outbound";
+  channel: "whatsapp";
+  messageType: "text" | "audio" | "interactive" | "other";
+  body?: string | null;
+  transcription?: string | null;
+  /** WhatsApp message id (wamid); unique, used to ignore redelivered webhooks. */
+  externalId?: string | null;
+  intent?: string | null;
+  processingStatus: "received" | "processed" | "failed";
+  error?: string | null;
+  createdAt: string;
+};

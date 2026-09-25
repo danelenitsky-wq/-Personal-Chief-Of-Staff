@@ -9,6 +9,7 @@ import type { Repositories } from "../types";
 import {
   profileToColumns,
   toActivity,
+  toConversationMessage,
   toColumns,
   toProfile,
   toProject,
@@ -224,6 +225,13 @@ export function createSupabaseRepositories(db: SupabaseClient): Repositories {
         );
         return row ? toProfile(row) : null;
       },
+      async findByPhone(phoneNumber) {
+        const row = unwrapMaybe(
+          await db.from("users").select("*").eq("phone_number", phoneNumber).maybeSingle(),
+          "looking up a user by phone",
+        );
+        return row ? toProfile(row) : null;
+      },
       async update(userId, patch) {
         const row = unwrapRow(
           await db
@@ -234,6 +242,45 @@ export function createSupabaseRepositories(db: SupabaseClient): Repositories {
           "updating the profile",
         );
         return toProfile(row);
+      },
+    },
+
+    conversations: {
+      async insert(userId, data) {
+        const row = unwrapRow(
+          await db
+            .from("conversation_messages")
+            .insert({ ...toColumns(data), user_id: userId })
+            .select("*")
+            .single(),
+          "storing a conversation message",
+        );
+        return toConversationMessage(row);
+      },
+      async update(userId, id, patch) {
+        check(
+          await db.from("conversation_messages").update(toColumns(patch)).eq("user_id", userId).eq("id", id),
+          "updating a conversation message",
+        );
+      },
+      async findByExternalId(externalId) {
+        const row = unwrapMaybe(
+          await db.from("conversation_messages").select("*").eq("external_id", externalId).maybeSingle(),
+          "looking up a conversation message",
+        );
+        return row ? toConversationMessage(row) : null;
+      },
+      async listRecent(userId, limit) {
+        const rows = unwrapRows(
+          await db
+            .from("conversation_messages")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(limit),
+          "listing conversation messages",
+        );
+        return rows.map(toConversationMessage);
       },
     },
   };

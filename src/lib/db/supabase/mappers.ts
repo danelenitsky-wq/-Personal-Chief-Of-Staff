@@ -3,6 +3,7 @@
  * camelCase. Postgres `time` columns come back as HH:mm:ss and are trimmed.
  */
 import type {
+  ConversationMessage,
   Project,
   Reminder,
   Task,
@@ -132,4 +133,21 @@ export function profileToColumns(patch: ProfilePatch): Row {
   const row = toColumns(patch as Record<string, unknown>);
   if ("phone_number" in row && row.phone_number === "") row.phone_number = null;
   return row;
+}
+
+export function toConversationMessage(row: Row): ConversationMessage {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    direction: row.direction as ConversationMessage["direction"],
+    channel: "whatsapp",
+    messageType: row.message_type as ConversationMessage["messageType"],
+    body: (row.body as string | null) ?? null,
+    transcription: (row.transcription as string | null) ?? null,
+    externalId: (row.external_id as string | null) ?? null,
+    intent: (row.intent as string | null) ?? null,
+    processingStatus: row.processing_status as ConversationMessage["processingStatus"],
+    error: (row.error as string | null) ?? null,
+    createdAt: row.created_at as string,
+  };
 }

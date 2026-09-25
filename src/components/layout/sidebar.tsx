@@ -11,9 +11,10 @@ type Props = {
   userLabel: string;
   demo: boolean;
   counts: { today: number; overdue: number; waiting: number };
+  whatsappConnected: boolean;
 };
 
-export function Sidebar({ userLabel, demo, counts }: Props) {
+export function Sidebar({ userLabel, demo, counts, whatsappConnected }: Props) {
   const pathname = usePathname();
   const badge: Record<string, number | undefined> = {
     "/": counts.today || undefined,
@@ -70,7 +71,7 @@ export function Sidebar({ userLabel, demo, counts }: Props) {
             <MessageCircle className="size-3.5 text-success" /> WhatsApp
           </div>
           <p className="text-muted-foreground">
-            Capture tasks by message. Connects in Phase 2.
+            {whatsappConnected ? "Connected. Text your Chief of Staff." : "Not connected yet. See Settings."}
           </p>
         </div>
         <div className="flex items-center justify-between gap-2 px-2">

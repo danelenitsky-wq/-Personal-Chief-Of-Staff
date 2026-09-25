@@ -17,7 +17,10 @@ export function integrationStatus() {
   return {
     supabase: isSupabaseConfigured(),
     whatsapp: Boolean(
-      process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID,
+      process.env.WHATSAPP_ACCESS_TOKEN &&
+        process.env.WHATSAPP_PHONE_NUMBER_ID &&
+        process.env.WHATSAPP_APP_SECRET &&
+        process.env.WHATSAPP_VERIFY_TOKEN,
     ),
     googleCalendar: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
     openai: Boolean(process.env.OPENAI_API_KEY),

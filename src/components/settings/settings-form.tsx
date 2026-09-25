@@ -71,7 +71,16 @@ export function SettingsForm({ profile, integrations }: { profile: UserProfile; 
 
       <Section title="Connections">
         <div className="divide-y rounded-lg border">
-          <Connection name="WhatsApp" connected={integrations.whatsapp} phase="Phase 2" detail="Capture, reminders and briefs by message" />
+          <Connection
+            name="WhatsApp"
+            connected={integrations.whatsapp}
+            phase="setup"
+            detail={
+              integrations.whatsapp
+                ? "Messages from your number above reach your Chief of Staff"
+                : "Webhook is ready; add the Meta credentials to connect"
+            }
+          />
           <Connection name="Google Calendar" connected={integrations.googleCalendar} phase="Phase 5" detail="Availability, timeline and time-blocking" />
           <Connection name="Database" connected={integrations.supabase} phase="Now" detail={integrations.supabase ? "Supabase" : "Demo mode: in-memory mock data"} />
         </div>
@@ -170,7 +179,11 @@ function Connection({ name, connected, phase, detail }: { name: string; connecte
         <p className="text-sm font-medium">{name}</p>
         <p className="text-xs text-muted-foreground">{detail}</p>
       </div>
-      {connected ? <Badge variant="success">Connected</Badge> : <Badge variant="outline">{phase === "Now" ? "Demo" : `Coming in ${phase}`}</Badge>}
+      {connected ? (
+        <Badge variant="success">Connected</Badge>
+      ) : (
+        <Badge variant="outline">{phase === "Now" ? "Demo" : phase === "setup" ? "Not configured" : `Coming in ${phase}`}</Badge>
+      )}
     </div>
   );
 }

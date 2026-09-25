@@ -6,6 +6,7 @@
  * Every method takes userId and must only ever touch that user's rows.
  */
 import type {
+  ConversationMessage,
   Project,
   ProjectStatus,
   Reminder,
@@ -67,7 +68,22 @@ export type ProfilePatch = Partial<Omit<UserProfile, "id" | "createdAt">>;
 
 export interface ProfileRepository {
   get(userId: string): Promise<UserProfile | null>;
+  /** Exact match on E.164 phone number ("+972..."). */
+  findByPhone(phoneNumber: string): Promise<UserProfile | null>;
   update(userId: string, patch: ProfilePatch): Promise<UserProfile>;
+}
+
+export type NewConversationMessage = Omit<ConversationMessage, "id" | "userId" | "createdAt">;
+
+export interface ConversationRepository {
+  insert(userId: string, data: NewConversationMessage): Promise<ConversationMessage>;
+  update(
+    userId: string,
+    id: string,
+    patch: Partial<Pick<ConversationMessage, "processingStatus" | "error" | "intent" | "externalId">>,
+  ): Promise<void>;
+  findByExternalId(externalId: string): Promise<ConversationMessage | null>;
+  listRecent(userId: string, limit: number): Promise<ConversationMessage[]>;
 }
 
 export type Repositories = {
@@ -77,4 +93,5 @@ export type Repositories = {
   waiting: WaitingForRepository;
   reminders: ReminderRepository;
   profiles: ProfileRepository;
+  conversations: ConversationRepository;
 };
