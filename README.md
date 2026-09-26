@@ -1,7 +1,7 @@
 # Chief of Staff
 
 A personal AI Chief of Staff: a WhatsApp agent and a web dashboard over one
-shared Supabase database. This repository is at **Phase 1: Foundation**.
+shared Supabase database. This repository is at **Phase 3: AI task capture**.
 
 ## Quick start (demo mode, no accounts needed)
 
@@ -29,7 +29,7 @@ npm run build
 1. Create a project at https://supabase.com (free tier is fine).
 2. Apply the schema, either:
    - Supabase CLI: `npx supabase link --project-ref <ref>` then `npx supabase db push`, or
-   - Dashboard: SQL Editor → paste `supabase/migrations/20260925000000_initial_schema.sql` → Run.
+   - Dashboard: SQL Editor → paste each file in `supabase/migrations/` in name order → Run.
 3. Authentication → Providers: keep **Email** enabled. Authentication → URL
    Configuration: set Site URL to your app URL and add
    `http://localhost:3000/auth/callback` to Redirect URLs (magic links).
@@ -81,8 +81,7 @@ Dashboard (server components, server actions)   REST API (/api/*)   WhatsApp web
 `POST /api/whatsapp` receives Meta webhooks; `GET /api/whatsapp` answers the
 verification handshake. For each message it: ignores redeliveries (same
 `wamid`), finds the user by `users.phone_number`, stores the message in
-`conversation_messages`, replies, and stores the reply. There is no AI yet, so
-the reply only acknowledges and never claims to have done anything.
+`conversation_messages`, replies (see Phase 3 below), and stores the reply.
 
 - Every POST must carry a valid `X-Hub-Signature-256` (HMAC of the raw body
   with `WHATSAPP_APP_SECRET`). In production, requests are refused if the
@@ -121,3 +120,36 @@ WHATSAPP_APP_SECRET=dev node scripts/simulate-whatsapp.mjs "Call the doctor tomo
    international format (e.g. +972501234567) and save.
 8. Send "hello" from your phone to the test number. You should get a reply,
    and see the exchange in Supabase → `conversation_messages`.
+
+
+## AI task capture (Phase 3)
+
+Each text message goes through a responder that may only act through four
+validated tools in `src/lib/ai/tools.ts`: `createTask`, `searchTasks`,
+`completeTask`, `updateTask`. Arguments are checked with Zod, dates may be
+relative ("tomorrow", "Friday") and are resolved in the user's time zone, and
+every call is scoped to the sender's user id. The model never writes to the
+database.
+
+- **With `OPENAI_API_KEY`**: `src/lib/ai/orchestrator.ts` sends the message,
+  the last 12 messages, recently mentioned tasks and the next 7 days of open
+  tasks to OpenAI with the tool definitions, runs the tool calls (up to 6
+  rounds) and replies.
+- **Without a key**: `src/lib/ai/rules.ts` handles the core patterns ("Call
+  doctor tomorrow", "What do I have tomorrow?", "Done with the doctor", "Move
+  it to Friday", several actions joined with "and") through the same tools.
+
+Guarantees in code, not just in the prompt:
+
+- A reply that claims an action ("✓ …") when no tool call changed anything is
+  replaced with "I couldn't process that correctly. Try rephrasing it."
+- If the AI call fails, the message stays stored (marked failed) and the user
+  gets that same reply.
+- A similar open task is never silently duplicated; the user is asked first.
+- "it" and numbered answers ("2" after "Which one?") are resolved from the
+  task ids saved on the previous reply (`conversation_messages.metadata`).
+- The detected intent is stored on the inbound message.
+
+To enable the AI, add `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`) to
+`.env.local` or your Vercel project's environment variables. Settings →
+Connections shows whether it is on.

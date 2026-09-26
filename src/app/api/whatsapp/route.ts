@@ -3,6 +3,7 @@ import { parseWebhookPayload, verifySignature, verifySubscription } from "@/lib/
 import { senderFromEnv } from "@/lib/whatsapp/sender";
 import { getWebhookRepositories } from "@/lib/container";
 import { createWhatsAppService } from "@/services/whatsapp-service";
+import { createResponder } from "@/lib/ai/responder";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,10 @@ export async function POST(request: NextRequest) {
   const messages = parseWebhookPayload(body);
   if (messages === null) return new NextResponse("Unsupported payload", { status: 400 });
 
-  const service = createWhatsAppService({ repos: getWebhookRepositories(), sender: senderFromEnv() });
+  const repos = getWebhookRepositories();
+  const { responder, mode } = createResponder({ repos });
+  logger.info("whatsapp.responder", { mode });
+  const service = createWhatsAppService({ repos, sender: senderFromEnv(), responder });
   for (const message of messages) {
     try {
       const outcome = await service.handleInbound(message);

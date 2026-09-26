@@ -80,7 +80,7 @@ export interface ConversationRepository {
   update(
     userId: string,
     id: string,
-    patch: Partial<Pick<ConversationMessage, "processingStatus" | "error" | "intent" | "externalId">>,
+    patch: Partial<Pick<ConversationMessage, "processingStatus" | "error" | "intent" | "externalId" | "metadata">>,
   ): Promise<void>;
   findByExternalId(externalId: string): Promise<ConversationMessage | null>;
   listRecent(userId: string, limit: number): Promise<ConversationMessage[]>;

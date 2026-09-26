@@ -3,17 +3,30 @@
  * dedupe → identify user by phone → store inbound → build reply → send →
  * store outbound. Phase 3 plugs the AI orchestrator in as the Responder.
  */
-import type { UserProfile } from "@/types/domain";
+import type { ConversationMessage, ConversationMetadata, UserProfile } from "@/types/domain";
 import type { Repositories } from "@/lib/db/types";
 import type { InboundMessage } from "@/lib/whatsapp/webhook";
 import type { MessageSender } from "@/lib/whatsapp/sender";
 import { logger } from "@/lib/logger";
 
-export type ResponderContext = { user: UserProfile; message: InboundMessage & { text: string } };
+export type ResponderContext = {
+  user: UserProfile;
+  message: InboundMessage & { text: string };
+  /** Earlier messages in this conversation, newest first (current one excluded). */
+  history: ConversationMessage[];
+};
 
-/** Produces the reply text for a text message. */
+export type ResponderResult = {
+  reply: string;
+  /** Detected intent, stored on the inbound message (brief §17). */
+  intent?: string;
+  /** Stored on the reply so follow-ups ("move it", "2") can be resolved. */
+  metadata?: ConversationMetadata;
+};
+
+/** Produces the reply for a text message. */
 export interface Responder {
-  respond(ctx: ResponderContext): Promise<string>;
+  respond(ctx: ResponderContext): Promise<ResponderResult>;
 }
 
 export const REPLIES = {
@@ -33,8 +46,8 @@ export const REPLIES = {
 export const phase2Responder: Responder = {
   async respond({ message }) {
     const text = message.text.trim().toLowerCase();
-    if (text === "help" || text === "?" || text === "hi" || text === "hello") return REPLIES.help;
-    return REPLIES.received;
+    if (text === "help" || text === "?" || text === "hi" || text === "hello") return { reply: REPLIES.help };
+    return { reply: REPLIES.received };
   },
 };
 
@@ -51,7 +64,12 @@ export function createWhatsAppService(deps: {
   const responder = deps.responder ?? phase2Responder;
   const { repos, sender } = deps;
 
-  async function sendAndStore(userId: string | null, to: string, body: string): Promise<boolean> {
+  async function sendAndStore(
+    userId: string | null,
+    to: string,
+    body: string,
+    metadata: ConversationMetadata = {},
+  ): Promise<boolean> {
     const result = await sender.sendText(to, body);
     if (result.ok) logger.info("whatsapp.outbound", { to, body, dryRun: result.dryRun });
     else logger.error("whatsapp.outbound.failed", { to, error: result.error });
@@ -65,15 +83,17 @@ export function createWhatsAppService(deps: {
         externalId: result.ok ? result.externalId : null,
         processingStatus: result.ok ? "processed" : "failed",
         error: result.ok ? null : result.error,
+        metadata,
       });
     }
     return result.ok;
   }
 
-  async function replyFor(user: UserProfile, message: InboundMessage): Promise<string> {
-    if (message.kind === "audio") return REPLIES.voiceNotYet;
-    if (message.text === null || message.text.trim() === "") return REPLIES.unsupported;
-    return responder.respond({ user, message: { ...message, text: message.text } });
+  async function replyFor(user: UserProfile, message: InboundMessage, inboundId: string): Promise<ResponderResult> {
+    if (message.kind === "audio") return { reply: REPLIES.voiceNotYet };
+    if (message.text === null || message.text.trim() === "") return { reply: REPLIES.unsupported };
+    const history = (await repos.conversations.listRecent(user.id, 13)).filter((m) => m.id !== inboundId).slice(0, 12);
+    return responder.respond({ user, message: { ...message, text: message.text }, history });
   }
 
   return {
@@ -117,13 +137,14 @@ export function createWhatsAppService(deps: {
         throw error;
       }
 
-      let reply: string;
+      let result: ResponderResult;
       let failed = false;
       try {
-        reply = await replyFor(user, message);
+        result = await replyFor(user, message, inboundId);
+        logger.info("whatsapp.intent", { externalId: message.externalId, intent: result.intent ?? null });
       } catch (error) {
         logger.error("whatsapp.processing_failed", { externalId: message.externalId, error: error as Error });
-        reply = REPLIES.failure;
+        result = { reply: REPLIES.failure };
         failed = true;
         await repos.conversations.update(user.id, inboundId, {
           processingStatus: "failed",
@@ -131,8 +152,13 @@ export function createWhatsAppService(deps: {
         });
       }
 
-      const replied = await sendAndStore(user.id, message.from, reply);
-      if (!failed) await repos.conversations.update(user.id, inboundId, { processingStatus: "processed" });
+      const replied = await sendAndStore(user.id, message.from, result.reply, result.metadata);
+      if (!failed) {
+        await repos.conversations.update(user.id, inboundId, {
+          processingStatus: "processed",
+          intent: result.intent ?? null,
+        });
+      }
       return { status: failed ? "failed" : "processed", externalId: message.externalId, userId: user.id, replied };
     },
   };

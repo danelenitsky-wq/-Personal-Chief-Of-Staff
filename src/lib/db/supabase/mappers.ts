@@ -148,6 +148,7 @@ export function toConversationMessage(row: Row): ConversationMessage {
     intent: (row.intent as string | null) ?? null,
     processingStatus: row.processing_status as ConversationMessage["processingStatus"],
     error: (row.error as string | null) ?? null,
+    metadata: (row.metadata as ConversationMessage["metadata"]) ?? {},
     createdAt: row.created_at as string,
   };
 }

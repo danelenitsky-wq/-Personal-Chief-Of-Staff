@@ -52,6 +52,14 @@ export function defaultProfile(userId: string, createdAt: string): UserProfile {
 const clone = <T>(value: T): T => structuredClone(value);
 const newId = () => crypto.randomUUID();
 
+/**
+ * Drops undefined keys, matching the Supabase client (JSON omits them), so an
+ * absent field in a patch never erases a stored value.
+ */
+function defined<T extends object>(patch: T): Partial<T> {
+  return Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
 export function createMemoryRepositories(
   store: MemoryStore = emptyStore(),
   now: () => Date = () => new Date(),
@@ -75,7 +83,7 @@ export function createMemoryRepositories(
       async update(userId, id, patch) {
         const task = store.tasks.find((t) => t.userId === userId && t.id === id);
         if (!task) return null;
-        Object.assign(task, patch, { updatedAt: stamp() });
+        Object.assign(task, defined(patch), { updatedAt: stamp() });
         return clone(task);
       },
       async delete(userId, id) {
@@ -123,7 +131,7 @@ export function createMemoryRepositories(
       async update(userId, id, patch) {
         const project = store.projects.find((p) => p.userId === userId && p.id === id);
         if (!project) return null;
-        Object.assign(project, patch, { updatedAt: stamp() });
+        Object.assign(project, defined(patch), { updatedAt: stamp() });
         return clone(project);
       },
     },
@@ -151,7 +159,7 @@ export function createMemoryRepositories(
       async update(userId, id, patch) {
         const item = store.waiting.find((w) => w.userId === userId && w.id === id);
         if (!item) return null;
-        Object.assign(item, patch);
+        Object.assign(item, defined(patch));
         return clone(item);
       },
     },
@@ -186,7 +194,7 @@ export function createMemoryRepositories(
           profile = defaultProfile(userId, stamp());
           store.profiles.push(profile);
         }
-        Object.assign(profile, patch);
+        Object.assign(profile, defined(patch));
         return clone(profile);
       },
     },
@@ -202,7 +210,7 @@ export function createMemoryRepositories(
       },
       async update(userId, id, patch) {
         const row = store.conversations.find((m) => m.userId === userId && m.id === id);
-        if (row) Object.assign(row, patch);
+        if (row) Object.assign(row, defined(patch));
       },
       async findByExternalId(externalId) {
         const row = store.conversations.find((m) => m.externalId === externalId);
@@ -212,6 +220,8 @@ export function createMemoryRepositories(
         return clone(
           store.conversations
             .filter((m) => m.userId === userId)
+            // Newest first; messages with the same timestamp keep insertion order.
+            .reverse()
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
             .slice(0, limit),
         );
