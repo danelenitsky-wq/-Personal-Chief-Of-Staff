@@ -14,7 +14,7 @@ import type { UpdateProfileInput } from "@/lib/validation/schemas";
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TIMEZONES = ["Asia/Jerusalem", "Europe/London", "Europe/Berlin", "America/New_York", "America/Los_Angeles", "Asia/Tokyo", "UTC"];
 
-type Integrations = { whatsapp: boolean; googleCalendar: boolean; supabase: boolean };
+type Integrations = { whatsapp: boolean; googleCalendar: boolean; supabase: boolean; openai: boolean };
 
 export function SettingsForm({ profile, integrations }: { profile: UserProfile; integrations: Integrations }) {
   const [p, setP] = useState(profile);
@@ -79,6 +79,16 @@ export function SettingsForm({ profile, integrations }: { profile: UserProfile; 
               integrations.whatsapp
                 ? "Messages from your number above reach your Chief of Staff"
                 : "Webhook is ready; add the Meta credentials to connect"
+            }
+          />
+          <Connection
+            name="AI (OpenAI)"
+            connected={integrations.openai}
+            phase="setup"
+            detail={
+              integrations.openai
+                ? "Understands free-form messages on WhatsApp"
+                : "Basic mode: simple commands like \"Call the doctor tomorrow\" still work"
             }
           />
           <Connection name="Google Calendar" connected={integrations.googleCalendar} phase="Phase 5" detail="Availability, timeline and time-blocking" />

@@ -213,5 +213,20 @@ export type ConversationMessage = {
   intent?: string | null;
   processingStatus: "received" | "processed" | "failed";
   error?: string | null;
+  metadata?: ConversationMetadata;
   createdAt: string;
 };
+
+export type ConversationMetadata = {
+  /** Tasks the message referred to (most relevant first). */
+  taskIds?: string[];
+  /** Options offered in a "Which one?" question, in the order shown. */
+  choiceTaskIds?: string[];
+  /** What to do with the user's answer to that question. */
+  pending?: PendingAction;
+};
+
+export type PendingAction =
+  | { action: "complete" }
+  | { action: "move"; date: string }
+  | { action: "create"; title: string; dueDate?: string | null };
